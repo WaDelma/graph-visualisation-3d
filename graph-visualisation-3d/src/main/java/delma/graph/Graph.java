@@ -54,6 +54,10 @@ public interface Graph<N, E> extends Iterable<Node<N>> {
 
     Node<N> getRandomNode(Random rand);
 
+    Optional<Edge<N, E>> getRandomEdge(Node<N> node, Random rand);
+
+    Collection<Graph<N, E>> getSubgraphs();
+
     static class Node<N> {
 
         private final N label;
@@ -82,6 +86,11 @@ public interface Graph<N, E> extends Iterable<Node<N>> {
             return Objects.equals(this.label, other.label);
         }
 
+        @Override
+        public String toString() {
+            return "(" + label.toString() + ")";
+        }
+
     }
 
     static class Edge<N, E> {
@@ -108,6 +117,10 @@ public interface Graph<N, E> extends Iterable<Node<N>> {
 
         public Node<N> getTo() {
             return to;
+        }
+
+        public boolean contains(Node<N> node) {
+            return from.equals(node) || to.equals(node);
         }
 
         public Optional<Node<N>> getOther(Node<N> node) {
@@ -158,6 +171,11 @@ public interface Graph<N, E> extends Iterable<Node<N>> {
                 return false;
             }
             return Objects.equals(this.label, other.label);
+        }
+
+        @Override
+        public String toString() {
+            return "E" + label.toString();
         }
 
         public static <N, E> Edge<N, E> flip(Edge<N, E> edge) {

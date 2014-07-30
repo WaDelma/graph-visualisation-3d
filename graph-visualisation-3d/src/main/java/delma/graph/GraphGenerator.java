@@ -3,18 +3,16 @@ package delma.graph;
 import delma.graph.Graph.Edge;
 import delma.graph.Graph.Node;
 import java.util.Random;
-import java.util.function.Supplier;
+import java.util.function.Function;
 
 /**
  * This generates randomised graphs for testing and other purposes.
  *
  * @author delma
  */
-public class GraphGenerator {
+public enum GraphGenerator {
 
-    private int nodeCount = 100;
-    private int edgeCount = 50;
-    private int maxWeigth = 100;
+    INSTANCE;
 
     /**
      * Generates new random graph
@@ -28,29 +26,19 @@ public class GraphGenerator {
      * @param nodeLabels
      * @param edgeLabels
      */
-    public static <N, E> void generate(Graph<N, E> graph, boolean directionless, int nodes, double edges, Supplier<N> nodeLabels, Supplier<E> edgeLabels) {
+    public static <N, E> void generate(Graph<N, E> graph, boolean directionless, int nodes, double edges, Function<Integer, N> nodeLabels, Function<Integer, E> edgeLabels) {
         graph.clear();
         Random rand = new Random();
 
+        int e = 0;
         for (int i = 0; i < nodes; i++) {
-            Node curNode = new Node(nodeLabels.get());
+            Node curNode = new Node(nodeLabels.apply(i));
             graph.add(curNode);
             Node<N> node = graph.getRandomNode(rand);
             if (!node.equals(curNode)) {
-                graph.add(new Edge(curNode, node, edgeLabels.get(), directionless));
+                graph.add(new Edge(curNode, node, edgeLabels.apply(e), directionless));
+                e++;
             }
         }
-    }
-
-    public int getNodeCount() {
-        return nodeCount;
-    }
-
-    public int getEdgeCount() {
-        return edgeCount;
-    }
-
-    public int getMaxWeigth() {
-        return maxWeigth;
     }
 }

@@ -9,6 +9,7 @@ import java.nio.file.Path;
 import org.lwjgl.BufferUtils;
 import org.lwjgl.opengl.GL11;
 import org.lwjgl.opengl.GL20;
+import org.lwjgl.util.vector.Matrix4f;
 
 /**
  *
@@ -20,12 +21,20 @@ public enum Util {
 
     public static FloatBuffer createBuffer(Vertex... vertices) {
         FloatBuffer verticesBuffer = BufferUtils.createFloatBuffer(vertices.length * Vertex.elementCount());
-        for (Vertex vertice : vertices) {
-            verticesBuffer.put(vertice.getCoord());
-            verticesBuffer.put(vertice.getColor());
+        for (Vertex vertex : vertices) {
+            verticesBuffer.put(vertex.getCoord());
+            verticesBuffer.put(vertex.getColor());
         }
         verticesBuffer.flip();
         return verticesBuffer;
+    }
+
+    private static final FloatBuffer matrix44Buffer = BufferUtils.createFloatBuffer(16);
+
+    public static FloatBuffer getBuffer(Matrix4f matrix) {
+        matrix.store(matrix44Buffer);
+        matrix44Buffer.flip();
+        return matrix44Buffer;
     }
 
     public static int loadShader(String filename, int type) {

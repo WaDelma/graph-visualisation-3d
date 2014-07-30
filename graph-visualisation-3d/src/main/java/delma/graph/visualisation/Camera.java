@@ -2,7 +2,6 @@ package delma.graph.visualisation;
 
 import delma.util.MathUtil;
 import java.nio.FloatBuffer;
-import org.lwjgl.BufferUtils;
 import org.lwjgl.util.vector.Matrix4f;
 import org.lwjgl.util.vector.Vector3f;
 
@@ -18,7 +17,6 @@ public class Camera {
     private float near, far;
     private float aspectRatio;
     private float frustum_length;
-    private final FloatBuffer matrix44Buffer;
     private float width, height;
     private float fov;
 
@@ -31,7 +29,6 @@ public class Camera {
         viewMatrix = new Matrix4f();
         projectionMatrix = new Matrix4f();
         modelMatrix = new Matrix4f();
-        matrix44Buffer = BufferUtils.createFloatBuffer(16);
     }
 
     /**
@@ -91,6 +88,10 @@ public class Camera {
         Matrix4f.rotate(x, new Vector3f(1, 0, 0), viewMatrix, viewMatrix);
         Matrix4f.rotate(y, new Vector3f(0, 1, 0), viewMatrix, viewMatrix);
         Matrix4f.rotate(z, new Vector3f(0, 0, 1), viewMatrix, viewMatrix);
+    }
+
+    public void scale(Vector3f scale) {
+        Matrix4f.scale(scale, viewMatrix, viewMatrix);
     }
 
     /**
@@ -184,30 +185,17 @@ public class Camera {
         projectionMatrix.m32 = -((2 * near * far) / frustum_length);
     }
 
-    private FloatBuffer getBuffer(Matrix4f matrix) {
-        matrix.store(matrix44Buffer);
-        matrix44Buffer.flip();
-        return matrix44Buffer;
-    }
-
     /**
      * @return the view matrix
      */
     public FloatBuffer getView() {
-        return getBuffer(viewMatrix);
+        return Util.getBuffer(viewMatrix);
     }
 
     /**
      * @return the projection matrix
      */
     public FloatBuffer getProjection() {
-        return getBuffer(projectionMatrix);
-    }
-
-    /**
-     * @return the model matrix
-     */
-    public FloatBuffer getModel() {
-        return getBuffer(modelMatrix);
+        return Util.getBuffer(projectionMatrix);
     }
 }

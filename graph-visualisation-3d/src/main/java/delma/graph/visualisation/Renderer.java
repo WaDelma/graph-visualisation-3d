@@ -1,8 +1,11 @@
 package delma.graph.visualisation;
 
-import delma.graph.visualisation.entity.Entity;
+import delma.graph.visualisation.entity.Node;
+import delma.util.FunctionalUtil;
+import java.nio.FloatBuffer;
 import java.util.ArrayList;
 import java.util.List;
+import org.lwjgl.BufferUtils;
 import org.lwjgl.LWJGLException;
 import org.lwjgl.opengl.ContextAttribs;
 import org.lwjgl.opengl.Display;
@@ -13,7 +16,8 @@ import org.lwjgl.opengl.GL20;
 import org.lwjgl.opengl.GL30;
 import org.lwjgl.opengl.PixelFormat;
 import org.lwjgl.util.glu.GLU;
-import org.lwjgl.util.vector.Vector4f;
+import org.lwjgl.util.vector.Matrix4f;
+import org.lwjgl.util.vector.Vector3f;
 
 /**
  *
@@ -32,15 +36,17 @@ public class Renderer implements Startable {
     private int programID = 0;
 
     private static final List<Model> models = new ArrayList<>();
-    private final Pool<Entity> entities;
-    private int entityPosID;
     private Camera camera;
     private int projectionMatrixID;
     private int viewMatrixID;
     private int modelMatrixID;
+    private final App context;
+    private FloatBuffer lineBuffer;
+    private int lineVboID;
+    private int lineVaoID;
 
-    public Renderer(Pool<Entity> entities) {
-        this.entities = entities;
+    public Renderer(App context) {
+        this.context = context;
     }
 
     @Override
@@ -48,6 +54,7 @@ public class Renderer implements Startable {
         camera = new Camera();
         setupOpenGL();
         setupShaders();
+        setupLineBuffer();
     }
 
     private void setupOpenGL() {
@@ -61,12 +68,6 @@ public class Renderer implements Startable {
             Display.setDisplayMode(new DisplayMode(WIDTH, HEIGHT));
             Display.setTitle(WINDOW_TITLE);
             Display.create(pixelFormat, contextAtrributes);
-
-//            GL11.glEnable(GL11.GL_DEPTH_TEST);
-//            GL11.glDepthFunc(GL11.GL_LEQUAL);
-//            GL11.glShadeModel(GL11.GL_SMOOTH);
-//            GL11.glHint(GL11.GL_PERSPECTIVE_CORRECTION_HINT, GL11.GL_NICEST);
-            resizeGL(WIDTH, HEIGHT);
         } catch (LWJGLException e) {
             e.printStackTrace();
             System.exit(-1);
@@ -75,15 +76,22 @@ public class Renderer implements Startable {
         // Setup an XNA like background color
         GL11.glClearColor(0.4f, 0.6f, 0.9f, 0f);
 
-        // Map the internal OpenGL coordinate system to the entire screen
-        GL11.glViewport(0, 0, WIDTH, HEIGHT);
+        GL11.glEnable(GL11.GL_DEPTH_TEST);
+        GL11.glDepthMask(true);
+        GL11.glDepthFunc(GL11.GL_LEQUAL);
+        GL11.glDepthRange(0.0f, 1.0f);
+
+        //GL11.glDepthFunc(GL11.GL_LEQUAL);
+        //GL11.glShadeModel(GL11.GL_SMOOTH);
+        //GL11.glHint(GL11.GL_PERSPECTIVE_CORRECTION_HINT, GL11.GL_NICEST);
+        resizeGL(WIDTH, HEIGHT);
 
         this.exitOnGLError("Error in setupOpenGL");
     }
 
     private void resizeGL(int width, int height) {
         camera.setFOV(90);
-        camera.setArea(0.1f, 100f);
+        camera.setArea(0f, 100f);
         camera.setAspectRatio(width, height);
         camera.updateView();
 
@@ -114,7 +122,6 @@ public class Renderer implements Startable {
 
         GL20.glLinkProgram(programID);
         GL20.glValidateProgram(programID);
-        entityPosID = GL20.glGetUniformLocation(programID, "entityPos");
         projectionMatrixID = GL20.glGetUniformLocation(programID, "projectionMatrix");
         viewMatrixID = GL20.glGetUniformLocation(programID, "viewMatrix");
         modelMatrixID = GL20.glGetUniformLocation(programID, "modelMatrix");
@@ -126,21 +133,53 @@ public class Renderer implements Startable {
         }
     }
 
+    private void setupLineBuffer() {
+        // Sending data to OpenGL requires the usage of (flipped) byte buffers
+        lineBuffer = BufferUtils.createFloatBuffer(200 * Vertex.elementCount());
+//        this.vertices = Util.createBuffer(vertices);
+
+//        indicesCount = indices.length;
+//        this.indices = BufferUtils.createByteBuffer(indicesCount);
+//        this.indices.put(indices);
+//        this.indices.flip();
+        // Create a new Vertex Array Object in memory and select it (bind)
+        lineVaoID = GL30.glGenVertexArrays();
+        GL30.glBindVertexArray(lineVaoID);
+
+        // Create a new Vertex Buffer Object in memory and select it (bind)
+        lineVboID = GL15.glGenBuffers();
+        GL15.glBindBuffer(GL15.GL_ARRAY_BUFFER, lineVboID);
+        //TODO: How to change buffer size depending how many edges there are?
+        GL15.glBufferData(GL15.GL_ARRAY_BUFFER, lineBuffer, GL15.GL_DYNAMIC_DRAW);
+
+        // Put the positions in attribute list 0
+        GL20.glVertexAttribPointer(0, 4, GL11.GL_FLOAT, false, Vertex.sizeInBytes(), 0);
+        // Put the colors in attribute list 1
+        GL20.glVertexAttribPointer(1, 4, GL11.GL_FLOAT, false, Vertex.sizeInBytes(), Vertex.elementBytes() * 4);
+        GL15.glBindBuffer(GL15.GL_ARRAY_BUFFER, 0);
+
+        // Deselect (bind to 0) the VAO
+        GL30.glBindVertexArray(0);
+
+        // Create a new VBO for the indices and select it (bind) - INDICES
+//        int indexVboID = GL15.glGenBuffers();
+//        GL15.glBindBuffer(GL15.GL_ELEMENT_ARRAY_BUFFER, indexVboID);
+//        GL15.glBufferData(GL15.GL_ELEMENT_ARRAY_BUFFER, this.indices, GL15.GL_STATIC_DRAW);
+//        GL15.glBindBuffer(GL15.GL_ELEMENT_ARRAY_BUFFER, 0);
+    }
+
     @Override
     public void tick() {
         GL11.glClear(GL11.GL_COLOR_BUFFER_BIT | GL11.GL_DEPTH_BUFFER_BIT);
         GL11.glClearDepth(1.0);
 
-        for (Entity entity : entities) {
+        context.getEntities().forEach(entity -> {
             Model model = entity.getModel();
-            Vector4f pos = entity.getPosition();
             GL20.glUseProgram(programID);
-            GL20.glUniform4f(entityPosID, pos.x, pos.y, pos.z, pos.w);
             GL20.glUniformMatrix4(projectionMatrixID, false, camera.getProjection());
             GL20.glUniformMatrix4(viewMatrixID, false, camera.getView());
-            //System.out.println(pos);
-//            camera.moveTo(pos);
-            GL20.glUniformMatrix4(modelMatrixID, false, camera.getModel());
+            GL20.glUniformMatrix4(modelMatrixID, false, Util.getBuffer(entity.getModelMatrix()));
+
             // Bind to the VAO that has all the information about the vertices
             GL30.glBindVertexArray(model.getVaoID());
             GL20.glEnableVertexAttribArray(0);
@@ -158,7 +197,59 @@ public class Renderer implements Startable {
             GL20.glDisableVertexAttribArray(0);
             GL30.glBindVertexArray(0);
             GL20.glUseProgram(0);
-        }
+        });
+
+        lineBuffer.clear();
+        context.getEntities().forEach(entity -> {
+            FunctionalUtil.acceptIfCan(Node.class, entity, node -> {
+                context.getGraph()
+                        .getNeighbourEdges(node.getNode())
+                        .forEach(edge -> {
+                            edge.getOther(node.getNode()).ifPresent(otherEdge -> {
+                                Vector3f pos = new Vector3f(node.getPosition());
+                                pos.scale(0.1f);
+                                Vector3f opos = new Vector3f(context.getNode(otherEdge).getPosition());
+                                opos.scale(0.1f);
+
+                                Vertex[] vertices = new Vertex[]{
+                                    new Vertex(pos),
+                                    new Vertex(opos)
+                                };
+                                for (Vertex vertex : vertices) {
+                                    lineBuffer.put(vertex.getCoord());
+                                    lineBuffer.put(vertex.getColor());
+                                }
+                            });
+                        });
+            });
+        });
+        lineBuffer.flip();
+
+        GL11.glLineWidth(0.9f);
+        GL20.glUseProgram(programID);
+        GL20.glUniformMatrix4(projectionMatrixID, false, camera.getProjection());
+        GL20.glUniformMatrix4(viewMatrixID, false, camera.getView());
+        GL20.glUniformMatrix4(modelMatrixID, false, Util.getBuffer(Matrix4f.setIdentity(new Matrix4f())));
+
+        // Bind to the VAO that has all the information about the vertices
+        GL30.glBindVertexArray(lineVaoID);
+        GL20.glEnableVertexAttribArray(0);
+        GL20.glEnableVertexAttribArray(1);
+
+        // Bind to the index VBO that has all the information about the order of the vertices
+        GL15.glBindBuffer(GL15.GL_ELEMENT_ARRAY_BUFFER, lineVboID);
+
+        GL15.glBufferSubData(GL15.GL_ELEMENT_ARRAY_BUFFER, 0, lineBuffer);
+        // Draw the vertices
+        GL11.glDrawArrays(GL11.GL_LINES, 0, 200);
+
+        // Put everything back to default (deselect)
+        GL15.glBindBuffer(GL15.GL_ELEMENT_ARRAY_BUFFER, 0);
+        GL20.glDisableVertexAttribArray(1);
+        GL20.glDisableVertexAttribArray(0);
+        GL30.glBindVertexArray(0);
+        GL20.glUseProgram(0);
+
         this.exitOnGLError("Error in loopCycle");
 
         Display.sync(60);

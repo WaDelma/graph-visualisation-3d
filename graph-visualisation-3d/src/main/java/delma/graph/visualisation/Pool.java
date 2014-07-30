@@ -3,6 +3,7 @@ package delma.graph.visualisation;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.Set;
+import java.util.stream.Stream;
 
 /**
  *
@@ -52,5 +53,9 @@ public class Pool<T> implements Iterable<T> {
 
     public void clear() {
         toBeRemoved.addAll(data);
+    }
+
+    public Stream<T> stream() {
+        return data.stream();
     }
 }

@@ -1,5 +1,7 @@
 package delma.graph.visualisation;
 
+import org.lwjgl.util.vector.Vector3f;
+
 /**
  *
  * @author delma
@@ -12,6 +14,11 @@ public class Vertex {
     public Vertex() {
         xyzw = new float[4];
         rgba = new float[4];
+    }
+
+    public Vertex(Vector3f position) {
+        this();
+        setCoord(position.x, position.y, position.z);
     }
 
     public Vertex setCoord(float x, float y, float z) {
