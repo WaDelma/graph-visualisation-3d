@@ -148,7 +148,7 @@ public class Node implements Entity {
         rand = new Random();
 //        displacement = new Vector3f();
 
-        scale = new Vector3f(0.1f, 0.1f, 0.1f);
+        scale = new Vector3f(0.5f, 0.5f, 0.5f);
         angle = new Vector3f(0, 0, 0);
         start = true;
 
@@ -183,7 +183,7 @@ public class Node implements Entity {
                     } else {
                         localVector.scale(1 / dist);
                     }
-                    localVector.scale((float) MathUtil.Ke / (dist * dist));
+                    localVector.scale((float) (MathUtil.Ke * 0.001f) / (dist * dist));
                     Vector3f.add(localVector, acceleration, acceleration);
                 });
 
@@ -201,7 +201,7 @@ public class Node implements Entity {
                         localVector.scale(1 / dist);
                     }
                     float springyness = 100000f;
-                    float springLength = 100;
+                    float springLength = 2000;
                     localVector.scale(-springyness * (dist - springLength));
 
                     Vector3f velocityDiff = Vector3f.sub(velocity, simNode.getVelocity(), null);

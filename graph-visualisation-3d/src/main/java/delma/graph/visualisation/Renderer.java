@@ -208,9 +208,9 @@ public class Renderer implements Startable {
                         .forEach(edge -> {
                             edge.getOther(node.getNode()).ifPresent(otherEdge -> {
                                 Vector3f pos = new Vector3f(node.getPosition());
-                                pos.scale(0.1f);
+                                pos.scale(0.5f);
                                 Vector3f opos = new Vector3f(context.getNode(otherEdge).getPosition());
-                                opos.scale(0.1f);
+                                opos.scale(0.5f);
 
                                 Vertex[] vertices = new Vertex[]{
                                     new Vertex(pos),
