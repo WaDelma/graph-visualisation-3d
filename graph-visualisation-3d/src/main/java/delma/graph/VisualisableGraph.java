@@ -52,22 +52,24 @@ public class VisualisableGraph implements Graph<Object, Object> {
 
     @Override
     public void add(Graph<Object, Object> graph) {
+        graph.getNodes().forEach(this::add);
         graph.getEdges().forEach(this::add);
     }
 
     @Override
     public boolean remove(Node<Object> node) {
+        if (!map.containsKey(node)) {
+            return false;
+        }
         map.get(node).forEach(e -> {
             e.getOther(node).ifPresent(n -> transpose.get(n).remove(e));
         });
         transpose.get(node).forEach(e -> {
             e.getOther(node).ifPresent(n -> map.get(n).remove(e));
         });
-        if (map.remove(node) != null) {
-            transpose.remove(node);
-            return true;
-        }
-        return false;
+        map.remove(node);
+        transpose.remove(node);
+        return true;
     }
 
     @Override
@@ -75,8 +77,10 @@ public class VisualisableGraph implements Graph<Object, Object> {
         Node<Object> from = edge.getFrom();
         Node<Object> to = edge.getTo();
         boolean flag = map.get(from).remove(edge);
-        flag |= map.get(to).remove(edge);
-        transpose.get(from).remove(edge);
+        if (edge.isDirectionless()) {
+            map.get(to).remove(edge);
+            transpose.get(from).remove(edge);
+        }
         transpose.get(to).remove(edge);
         return flag;
     }

@@ -1,5 +1,7 @@
 package delma.graph.visualisation;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import delma.graph.Graph;
 import delma.graph.Graph.Edge;
 import delma.graph.GraphGenerator;
@@ -43,6 +45,7 @@ public class App implements Startable {
     private Deque<Graph<Object, Object>> graphStack;
     private Map<Graph.Node, Graph.Node> childToParentMap;
     private Map<Graph.Node, Node> nodeToNodeMap;
+    private static final ObjectMapper MAPPER = new ObjectMapper();
 
     @Override
     public void create() {
@@ -73,17 +76,19 @@ public class App implements Startable {
                             childToParentMap.clear();
                             nodeToNodeMap.clear();
 
-                            GraphGenerator.generate(graph, true, 100, 50, n -> n, n -> n);
+                            GraphGenerator.generate(graph, true, 1000, 500, n -> n, n -> n);
                             graphStack.push(graph);
                             int subGraphs = graph.getSubgraphs().size();
-                            while (graph.size() > subGraphs) {
-                                graph = createCoarced(graph.getSubgraphs());
-                                graphStack.push(graph);
+                            while (graphStack.peekFirst().size() > subGraphs) {
+//                                System.out.println(graphStack.peekFirst().size() + " > " + subGraphs);
+                                graphStack.push(createCoarced(graphStack.peekFirst().getSubgraphs()));
                             }
+                            graph = graphStack.pop();
                             for (Graph.Node node : graph) {
                                 Node simNode = new Node(this, graph, node);
-                                nodeToNodeMap.put(node, simNode);
                                 simNode.create();
+                                simNode.setTemperature(graphStack.size());
+                                nodeToNodeMap.put(node, simNode);
                                 addEntity(simNode);
                             }
                         }
@@ -132,20 +137,17 @@ public class App implements Startable {
                 entities.stream()
                         .filter(e -> e instanceof Node)
                         .map(e -> (Node) e)
-                        .filter(n -> n.isReady())
+                        .filter(n -> !n.isReady())
                         .findAny()
                         .orElseGet(() -> {
                             graph = graphStack.pop();
                             entities.clear();
                             nodemap.clear();
                             for (Graph.Node node : graph) {
-                                Node simNode = new Node(this, graph, node);
-                                nodeToNodeMap.put(node, simNode);
+                                Node simNode = new Node(this, graph, node, findParent(node).getPosition());
                                 simNode.create();
-                                System.out.println("Node: " + node);
-                                System.out.println("Parent: " + childToParentMap.get(node));
-                                System.out.println("SimNode: " + nodeToNodeMap.get(childToParentMap.get(node)));
-                                simNode.getPosition().set(nodeToNodeMap.get(childToParentMap.get(node)).getPosition());
+                                simNode.setTemperature(graphStack.size());
+                                nodeToNodeMap.put(node, simNode);
                                 addEntity(simNode);
                             }
                             return null;
@@ -153,6 +155,26 @@ public class App implements Startable {
             }
             renderer.tick();
         }
+    }
+
+    private Node findParent(Graph.Node node) {
+//        try {
+//            System.out.println("Node: " + MAPPER.writeValueAsString(node));
+//            System.out.println("Parent: " + MAPPER.writeValueAsString(childToParentMap.get(node)));
+//        } catch (JsonProcessingException ex) {
+//            Logger.getLogger(App.class.getName()).log(Level.SEVERE, null, ex);
+//        }
+//
+//        System.out.println("SimNode: " + nodeToNodeMap.containsKey(childToParentMap.get(node)));
+//        if (nodeToNodeMap.get(childToParentMap.get(node)) == null) {
+//            try {
+//                System.out.println(MAPPER.writeValueAsString(nodeToNodeMap));
+//            } catch (JsonProcessingException ex) {
+//                Logger.getLogger(App.class.getName()).log(Level.SEVERE, null, ex);
+//            }
+//        }
+        //TODO: Sometimes it seems like that there isn't mapping between graph node and simulation node.
+        return Objects.requireNonNull(nodeToNodeMap.get(childToParentMap.get(node)));
     }
 
     @Override
@@ -189,6 +211,7 @@ public class App implements Startable {
     }
 
     private Graph<Object, Object> createCoarced(Collection<Graph<Object, Object>> graphs) {
+//        System.out.println("COARSE");
         VisualisableGraph result = new VisualisableGraph();
         graphs.forEach(g -> result.add(createCoarcedForSub(g)));
         return result;
@@ -204,10 +227,14 @@ public class App implements Startable {
     private void addNodes(Graph<Object, Object> source, Graph<Object, Object> result) {
         Deque<Graph.Node<Object>> notUsed = new ArrayDeque<>(source.getNodes());
         List<Edge<Object, Object>> notUsedEdges = new ArrayList<>(source.getEdges());
-        System.out.println("Coarsing subgraph of size: " + source.size());
+//        System.out.println("Coarsing subgraph of size: " + source.size());
         while (!notUsed.isEmpty()) {
-            System.out.println("E: " + notUsedEdges.size());
-            System.out.println(notUsed);
+//            System.out.println("E: " + notUsedEdges.size());
+//            try {
+//                System.out.println(MAPPER.writeValueAsString(notUsed));
+//            } catch (JsonProcessingException ex) {
+//                Logger.getLogger(App.class.getName()).log(Level.SEVERE, null, ex);
+//            }
             Graph.Node<Object> node = notUsed.peek();
             Optional<Edge<Object, Object>> optional = findEdge(notUsedEdges, node);
             if (optional.isPresent()) {
@@ -225,11 +252,11 @@ public class App implements Startable {
                 childToParentMap.put(other, newNode);
                 result.add(newNode);
             } else {
-                System.out.println("Singleton graph");
+//                System.out.println("Singleton graph");
                 notUsed.remove(node);
-//                Graph.Node<Object> newNode = new Graph.Node(node);
-//                childToParentMap.put(node, newNode);
-//                result.add(newNode);
+                Graph.Node<Object> newNode = new Graph.Node(new Wrapper(node));
+                childToParentMap.put(node, newNode);
+                result.add(newNode);
             }
         }
     }
@@ -247,6 +274,10 @@ public class App implements Startable {
                 addEdge(source, combiner.first, result);
                 addEdge(source, combiner.second, result);
             });
+
+            FunctionalUtil.acceptIfCan(Wrapper.class, n.getLabel(), wrapper -> {
+                addEdge(source, wrapper.node, result);
+            });
         });
     }
 
@@ -254,9 +285,6 @@ public class App implements Startable {
         source.getNeighbourEdges(node).forEach(e -> {
             Graph.Node<Object> parent = childToParentMap.get(node);
             Graph.Node<Object> otherParent = childToParentMap.get(e.getOther(node).get());
-            if (otherParent == null || parent == null) {
-                return;
-            }
             if (otherParent.equals(parent)) {
                 return;
             }
@@ -272,6 +300,16 @@ public class App implements Startable {
         public Combiner(Graph.Node<Object> first, Graph.Node<Object> second) {
             this.first = first;
             this.second = second;
+        }
+
+        @JsonProperty("f")
+        public Graph.Node<Object> getFirst() {
+            return first;
+        }
+
+        @JsonProperty("s")
+        public Graph.Node<Object> getSecond() {
+            return second;
         }
 
         @Override
@@ -296,7 +334,42 @@ public class App implements Startable {
 
         @Override
         public String toString() {
-            return "(" + first + "|" + second + ")";
+            return "{" + first + "|" + second + "}";
+        }
+    }
+
+    private static class Wrapper {
+
+        private final Graph.Node<Object> node;
+
+        public Wrapper(Graph.Node<Object> node) {
+            this.node = node;
+        }
+
+        @JsonProperty("n")
+        public Graph.Node<Object> getNode() {
+            return node;
+        }
+
+        @Override
+        public int hashCode() {
+            int hash = 3;
+            hash = 59 * hash + Objects.hashCode(this.node);
+            return hash;
+        }
+
+        @Override
+        public boolean equals(Object obj) {
+            if (obj == null || getClass() != obj.getClass()) {
+                return false;
+            }
+            final Wrapper other = (Wrapper) obj;
+            return Objects.equals(this.node, other.node);
+        }
+
+        @Override
+        public String toString() {
+            return "[" + node + "]";
         }
     }
 

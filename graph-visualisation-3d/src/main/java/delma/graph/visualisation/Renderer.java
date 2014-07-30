@@ -44,6 +44,7 @@ public class Renderer implements Startable {
     private FloatBuffer lineBuffer;
     private int lineVboID;
     private int lineVaoID;
+    private static final int MAX_LINES = 20000;
 
     public Renderer(App context) {
         this.context = context;
@@ -135,7 +136,7 @@ public class Renderer implements Startable {
 
     private void setupLineBuffer() {
         // Sending data to OpenGL requires the usage of (flipped) byte buffers
-        lineBuffer = BufferUtils.createFloatBuffer(200 * Vertex.elementCount());
+        lineBuffer = BufferUtils.createFloatBuffer(MAX_LINES * Vertex.elementCount());
 //        this.vertices = Util.createBuffer(vertices);
 
 //        indicesCount = indices.length;
@@ -241,7 +242,7 @@ public class Renderer implements Startable {
 
         GL15.glBufferSubData(GL15.GL_ELEMENT_ARRAY_BUFFER, 0, lineBuffer);
         // Draw the vertices
-        GL11.glDrawArrays(GL11.GL_LINES, 0, 200);
+        GL11.glDrawArrays(GL11.GL_LINES, 0, MAX_LINES);
 
         // Put everything back to default (deselect)
         GL15.glBindBuffer(GL15.GL_ELEMENT_ARRAY_BUFFER, 0);

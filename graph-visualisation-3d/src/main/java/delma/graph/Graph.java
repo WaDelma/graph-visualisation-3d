@@ -1,5 +1,6 @@
 package delma.graph;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
 import delma.graph.Graph.Node;
 import java.util.Collection;
 import java.util.Iterator;
@@ -66,6 +67,7 @@ public interface Graph<N, E> extends Iterable<Node<N>> {
             this.label = label;
         }
 
+        @JsonProperty("l")
         public N getLabel() {
             return label;
         }
@@ -88,9 +90,8 @@ public interface Graph<N, E> extends Iterable<Node<N>> {
 
         @Override
         public String toString() {
-            return "(" + label.toString() + ")";
+            return "(" + label + ")";
         }
-
     }
 
     static class Edge<N, E> {
@@ -171,11 +172,6 @@ public interface Graph<N, E> extends Iterable<Node<N>> {
                 return false;
             }
             return Objects.equals(this.label, other.label);
-        }
-
-        @Override
-        public String toString() {
-            return "E" + label.toString();
         }
 
         public static <N, E> Edge<N, E> flip(Edge<N, E> edge) {

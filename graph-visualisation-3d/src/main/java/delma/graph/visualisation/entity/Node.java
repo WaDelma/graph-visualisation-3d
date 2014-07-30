@@ -87,11 +87,11 @@ public class Node implements Entity {
     private Graph<Object, Object> graph;
     private Graph.Node<Object> node;
     private App context;
-    private float temperature;
+    private float temperature = 1;
     private boolean halt;
 //    private Vector3f displacement;
 
-    private Vector3f pos;
+    private final Vector3f pos;
     private Vector3f scale;
     private Vector3f angle;
     private boolean start;
@@ -101,12 +101,25 @@ public class Node implements Entity {
 
     public Node() {
         halt = true;
+        pos = new Vector3f();//rand.nextFloat() - 0.5f, rand.nextFloat() - 0.5f, rand.nextFloat() - 0.5f);
     }
 
     public Node(App app, Graph<Object, Object> graph, Graph.Node<Object> node) {
         this.context = app;
         this.graph = graph;
         this.node = node;
+        this.pos = new Vector3f(); //rand.nextFloat() - 0.5f, rand.nextFloat() - 0.5f, rand.nextFloat() - 0.5f);
+    }
+
+    public Node(App app, Graph<Object, Object> graph, Graph.Node<Object> node, Vector3f pos) {
+        this.context = app;
+        this.graph = graph;
+        this.node = node;
+        this.pos = new Vector3f(pos);
+    }
+
+    public void setTemperature(float temperature) {
+        this.temperature = temperature;
     }
 
     @Override
@@ -133,10 +146,8 @@ public class Node implements Entity {
     @Override
     public void create() {
         rand = new Random();
-        temperature = 10;
 //        displacement = new Vector3f();
 
-        pos = new Vector3f(rand.nextFloat() - 0.5f, rand.nextFloat() - 0.5f, rand.nextFloat() - 0.5f);
         scale = new Vector3f(0.1f, 0.1f, 0.1f);
         angle = new Vector3f(0, 0, 0);
         start = true;
@@ -189,8 +200,8 @@ public class Node implements Entity {
                     } else {
                         localVector.scale(1 / dist);
                     }
-                    float springyness = 10f;
-                    float springLength = 200;
+                    float springyness = 100000f;
+                    float springLength = 100;
                     localVector.scale(-springyness * (dist - springLength));
 
                     Vector3f velocityDiff = Vector3f.sub(velocity, simNode.getVelocity(), null);
