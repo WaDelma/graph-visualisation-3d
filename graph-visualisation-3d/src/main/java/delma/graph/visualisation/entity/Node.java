@@ -6,6 +6,8 @@ import delma.graph.visualisation.Model;
 import delma.graph.visualisation.Renderer;
 import delma.graph.visualisation.Vertex;
 import delma.util.MathUtil;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Random;
 import org.lwjgl.util.vector.Matrix4f;
 import org.lwjgl.util.vector.Vector3f;
@@ -89,7 +91,6 @@ public class Node implements Entity {
     private App context;
     private float temperature = 1;
     private boolean halt;
-//    private Vector3f displacement;
 
     private final Vector3f pos;
     private Vector3f scale;
@@ -101,14 +102,14 @@ public class Node implements Entity {
 
     public Node() {
         halt = true;
-        pos = new Vector3f();//rand.nextFloat() - 0.5f, rand.nextFloat() - 0.5f, rand.nextFloat() - 0.5f);
+        pos = new Vector3f();
     }
 
     public Node(App app, Graph<Object, Object> graph, Graph.Node<Object> node) {
         this.context = app;
         this.graph = graph;
         this.node = node;
-        this.pos = new Vector3f(); //rand.nextFloat() - 0.5f, rand.nextFloat() - 0.5f, rand.nextFloat() - 0.5f);
+        this.pos = new Vector3f();
     }
 
     public Node(App app, Graph<Object, Object> graph, Graph.Node<Object> node, Vector3f pos) {
@@ -146,7 +147,6 @@ public class Node implements Entity {
     @Override
     public void create() {
         rand = new Random();
-//        displacement = new Vector3f();
 
         scale = new Vector3f(0.5f, 0.5f, 0.5f);
         angle = new Vector3f(0, 0, 0);
@@ -164,62 +164,74 @@ public class Node implements Entity {
         if (start) {
             start = false;
         } else {
+//            Vector3f finalVel = new Vector3f(velocity);
+//            finalVel.scale(context.getDelta() * 60);
             Vector3f.add(velocity, pos, pos);
-            if (velocity.length() < 0.01f) {
+            if (velocity.length() < 0.5f) {
                 halt = true;
                 return;
             }
         }
         acceleration.set(0, 0, 0);
-        context.getNodes()
-                .forEach(n -> {
-                    Vector3f localVector = Vector3f.sub(n.getPosition(), pos, null);
-                    float dist = localVector.length();
-                    float min = 0.001f;
-                    if (dist < min) {
-                        MathUtil.randomUnitVector(rand, localVector);
-                        localVector.scale(min);
-                        dist = min;
-                    } else {
-                        localVector.scale(1 / dist);
-                    }
-                    localVector.scale((float) (MathUtil.Ke * 0.001f) / (dist * dist));
-                    Vector3f.add(localVector, acceleration, acceleration);
-                });
+        repulsion();
+        springs();
+        Vector3f.add(acceleration, velocity, velocity);
 
+        float dist = normalise(velocity);
+        velocity.scale(Math.min(temperature, dist));
+        temperature *= 0.91;
+    }
+
+    private final float tressHold = 0.9f;
+
+    private void repulsion() {
+        context.getOctree().forEach(pos, tressHold, n -> {
+            List<Vector3f> positions = new ArrayList<>();
+            if (n.getData().isEmpty()) {
+                positions.add(n.getMassCenter());
+            } else {
+                n.getData()
+                        .stream()
+                        .map(e -> e.getPosition())
+                        .forEach(positions::add);
+            }
+            positions.forEach(vec -> {
+                Vector3f force = Vector3f.sub(vec, pos, null);
+                float dist = normalise(force);
+                force.scale((float) (MathUtil.Ke * 0.001f) / (dist * dist));
+                Vector3f.add(force, acceleration, acceleration);
+            });
+        });
+    }
+
+    private void springs() {
         graph.getNeighbourNodes(node)
                 .forEach(n -> {
                     Node simNode = context.getNode(n);
-                    Vector3f localVector = Vector3f.sub(simNode.getPosition(), pos, null);
-                    float dist = localVector.length();
-                    float min = 0.001f;
-                    if (dist < min) {
-                        MathUtil.randomUnitVector(rand, localVector);
-                        localVector.scale(min);
-                        dist = min;
-                    } else {
-                        localVector.scale(1 / dist);
-                    }
+                    Vector3f force = Vector3f.sub(simNode.getPosition(), pos, null);
+                    float dist = normalise(force);
                     float springyness = 100000f;
                     float springLength = 2000;
-                    localVector.scale(-springyness * (dist - springLength));
+                    force.scale(-springyness * (dist - springLength));
 
                     Vector3f velocityDiff = Vector3f.sub(velocity, simNode.getVelocity(), null);
                     velocityDiff.scale(0.5f);
-                    Vector3f.sub(localVector, velocityDiff, localVector);
+                    Vector3f.sub(force, velocityDiff, force);
 
-                    Vector3f.add(localVector, acceleration, acceleration);
+                    Vector3f.add(force, acceleration, acceleration);
                 });
-        Vector3f.add(acceleration, velocity, velocity);
+    }
 
-        float dist = velocity.length();
-        velocity.scale(dist == 0 ? 0 : 1 / dist);
-        velocity.scale(Math.min(temperature, dist));
-        temperature *= 0.91;
-
-//        System.out.println("pos: " + pos);
-//        System.out.println("velocity: " + velocity);
-//        System.out.println("acceleration: " + acceleration);
+    private float normalise(Vector3f localVector) {
+        float dist = localVector.length();
+        float min = 0.0001f;
+        if (dist < min) {
+            MathUtil.randomUnitVector(rand, localVector);
+            dist = min;
+        } else {
+            localVector.scale(1 / dist);
+        }
+        return dist;
     }
 
     @Override

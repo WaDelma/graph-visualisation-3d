@@ -12,7 +12,7 @@ import org.lwjgl.util.vector.Vector3f;
 public class Camera {
 
     private final Vector3f viewVector, rotationVector;
-    private final Matrix4f viewMatrix, projectionMatrix, modelMatrix;
+    private final Matrix4f viewMatrix, projectionMatrix;
     private float y_scale;
     private float near, far;
     private float aspectRatio;
@@ -28,7 +28,6 @@ public class Camera {
         rotationVector = new Vector3f(0, 0, 0);
         viewMatrix = new Matrix4f();
         projectionMatrix = new Matrix4f();
-        modelMatrix = new Matrix4f();
     }
 
     /**
@@ -50,6 +49,11 @@ public class Camera {
      */
     public void set(float x, float y, float z) {
         viewVector.set(x, y, z);
+        Matrix4f.translate(viewVector, viewMatrix, viewMatrix);
+    }
+
+    public void set(Vector3f vector) {
+        viewVector.set(vector.x, vector.y, vector.z);
         Matrix4f.translate(viewVector, viewMatrix, viewMatrix);
     }
 

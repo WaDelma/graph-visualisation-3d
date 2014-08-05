@@ -1,23 +1,16 @@
 package delma.graph.visualisation;
 
-import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import delma.graph.Graph;
-import delma.graph.Graph.Edge;
 import delma.graph.GraphGenerator;
 import delma.graph.VisualisableGraph;
 import delma.graph.visualisation.entity.Entity;
 import delma.graph.visualisation.entity.Node;
+import delma.tree.Octree;
 import delma.util.FunctionalUtil;
-import java.util.ArrayDeque;
-import java.util.ArrayList;
 import java.util.Collection;
-import java.util.Deque;
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
-import java.util.Objects;
-import java.util.Optional;
 import org.lwjgl.input.Keyboard;
 import org.lwjgl.input.Mouse;
 import org.lwjgl.opengl.Display;
@@ -40,116 +33,42 @@ public class App implements Startable {
     private Renderer renderer;
     private Pool<Entity> entities;
     private Graph<Object, Object> graph;
-    private static final float CAM_SPEED = 0.02f;
+    private static final float CAM_SPEED = 2f;
     private final Vector3f camMove = new Vector3f();
-    private Deque<Graph<Object, Object>> graphStack;
-    private Map<Graph.Node, Graph.Node> childToParentMap;
-    private Map<Graph.Node, Node> nodeToNodeMap;
     private static final ObjectMapper MAPPER = new ObjectMapper();
+    private Octree<Entity> octree;
+    private GraphCoarcer coarcer;
+    private float delta;
+    private long lastTime;
 
     @Override
     public void create() {
-        childToParentMap = new HashMap<>();
-        nodeToNodeMap = new HashMap<>();
-
-        graphStack = new ArrayDeque<>();
-
         graph = new VisualisableGraph();
-
         renderer = new Renderer(this);
         renderer.create();
-
         entities = new Pool<>();
+        coarcer = new GraphCoarcer(this);
     }
 
     @Override
     public void tick() {
         while (!Display.isCloseRequested()) {
-            while (Keyboard.next()) {
-                boolean state = Keyboard.getEventKeyState();
-                switch (Keyboard.getEventKey()) {
-                    case Keyboard.KEY_0:
-                        if (state) {
-                            entities.clear();
-                            nodemap.clear();
-                            graphStack.clear();
-                            childToParentMap.clear();
-                            nodeToNodeMap.clear();
-
-                            GraphGenerator.generate(graph, true, 1000, 500, n -> n, n -> n);
-                            graphStack.push(graph);
-                            int subGraphs = graph.getSubgraphs().size();
-                            while (graphStack.peekFirst().size() > subGraphs) {
-//                                System.out.println(graphStack.peekFirst().size() + " > " + subGraphs);
-                                graphStack.push(createCoarced(graphStack.peekFirst().getSubgraphs()));
-                            }
-                            graph = graphStack.pop();
-                            for (Graph.Node node : graph) {
-                                Node simNode = new Node(this, graph, node);
-                                simNode.create();
-                                simNode.setTemperature(graphStack.size());
-                                nodeToNodeMap.put(node, simNode);
-                                addEntity(simNode);
-                            }
-                        }
-                        break;
-                    case Keyboard.KEY_W:
-                        if (state) {
-                            camMove.y += CAM_SPEED;
-                        } else {
-                            camMove.y -= CAM_SPEED;
-                        }
-                        break;
-                    case Keyboard.KEY_A:
-                        if (state) {
-                            camMove.x -= CAM_SPEED;
-                        } else {
-                            camMove.x += CAM_SPEED;
-                        }
-                        break;
-                    case Keyboard.KEY_S:
-                        if (state) {
-                            camMove.y -= CAM_SPEED;
-                        } else {
-                            camMove.y += CAM_SPEED;
-                        }
-                        break;
-                    case Keyboard.KEY_D:
-                        if (state) {
-                            camMove.x += CAM_SPEED;
-                        } else {
-                            camMove.x -= CAM_SPEED;
-                        }
-                        break;
-                }
-            }
-
-            if (Mouse.isButtonDown(1)) {
-                renderer.getCamera().rotate(Mouse.getDX() * 0.01f, Mouse.getDY() * 0.01f, 0);
-            }
-            float distance = 1 + Mouse.getDWheel() / 600f;
-            renderer.getCamera().scale(new Vector3f(distance, distance, distance));
-            renderer.getCamera().set(camMove.x, camMove.y, camMove.z);
+            delta = calcDelta();
+            octree = Octree.create(entities, 0.001);
+            handleInput();
             entities.update();
             entities.forEach(e -> e.tick());
             entities.update();
-            if (!graphStack.isEmpty()) {
+            if (!coarcer.ready()) {
                 entities.stream()
                         .filter(e -> e instanceof Node)
                         .map(e -> (Node) e)
                         .filter(n -> !n.isReady())
                         .findAny()
                         .orElseGet(() -> {
-                            graph = graphStack.pop();
                             entities.clear();
                             nodemap.clear();
-                            for (Graph.Node node : graph) {
-                                Node simNode = new Node(this, graph, node, findParent(node).getPosition());
-                                simNode.create();
-                                simNode.setTemperature(graphStack.size());
-                                nodeToNodeMap.put(node, simNode);
-                                addEntity(simNode);
-                            }
+                            graph = coarcer.uncoarce();
                             return null;
                         });
             }
@@ -157,24 +76,56 @@ public class App implements Startable {
         }
     }
 
-    private Node findParent(Graph.Node node) {
-//        try {
-//            System.out.println("Node: " + MAPPER.writeValueAsString(node));
-//            System.out.println("Parent: " + MAPPER.writeValueAsString(childToParentMap.get(node)));
-//        } catch (JsonProcessingException ex) {
-//            Logger.getLogger(App.class.getName()).log(Level.SEVERE, null, ex);
-//        }
-//
-//        System.out.println("SimNode: " + nodeToNodeMap.containsKey(childToParentMap.get(node)));
-//        if (nodeToNodeMap.get(childToParentMap.get(node)) == null) {
-//            try {
-//                System.out.println(MAPPER.writeValueAsString(nodeToNodeMap));
-//            } catch (JsonProcessingException ex) {
-//                Logger.getLogger(App.class.getName()).log(Level.SEVERE, null, ex);
-//            }
-//        }
-        //TODO: Sometimes it seems like that there isn't mapping between graph node and simulation node.
-        return Objects.requireNonNull(nodeToNodeMap.get(childToParentMap.get(node)));
+    private void handleInput() {
+        while (Keyboard.next()) {
+            boolean state = Keyboard.getEventKeyState();
+            switch (Keyboard.getEventKey()) {
+                case Keyboard.KEY_0:
+                    if (state) {
+                        entities.clear();
+                        nodemap.clear();
+                        GraphGenerator.generate(graph, true, 10000, 5000, n -> n, n -> n);
+                        coarcer.coarce(graph);
+                    }
+                    break;
+                case Keyboard.KEY_W:
+                    if (state) {
+                        camMove.y += CAM_SPEED;
+                    } else {
+                        camMove.y -= CAM_SPEED;
+                    }
+                    break;
+                case Keyboard.KEY_A:
+                    if (state) {
+                        camMove.x -= CAM_SPEED;
+                    } else {
+                        camMove.x += CAM_SPEED;
+                    }
+                    break;
+                case Keyboard.KEY_S:
+                    if (state) {
+                        camMove.y -= CAM_SPEED;
+                    } else {
+                        camMove.y += CAM_SPEED;
+                    }
+                    break;
+                case Keyboard.KEY_D:
+                    if (state) {
+                        camMove.x += CAM_SPEED;
+                    } else {
+                        camMove.x -= CAM_SPEED;
+                    }
+                    break;
+            }
+        }
+
+        if (Mouse.isButtonDown(1)) {
+            renderer.getCamera().rotate(Mouse.getDX() * 0.01f, Mouse.getDY() * 0.01f, 0);
+        }
+        float wheel = Mouse.getDWheel();
+        float distance = 1 + wheel / 600;
+        renderer.getCamera().scale(new Vector3f(distance, distance, distance));
+        renderer.getCamera().set(camMove);
     }
 
     @Override
@@ -210,167 +161,19 @@ public class App implements Startable {
         return entities;
     }
 
-    private Graph<Object, Object> createCoarced(Collection<Graph<Object, Object>> graphs) {
-//        System.out.println("COARSE");
-        VisualisableGraph result = new VisualisableGraph();
-        graphs.forEach(g -> result.add(createCoarcedForSub(g)));
+    public Octree<Entity> getOctree() {
+        return octree;
+    }
+
+    private float calcDelta() {
+        long curTime = System.nanoTime();
+        float result = (float) ((curTime - lastTime) / 1000000000d);
+        lastTime = curTime;
         return result;
     }
 
-    private Graph<Object, Object> createCoarcedForSub(Graph<Object, Object> source) {
-        Graph<Object, Object> result = new VisualisableGraph();
-        addNodes(source, result);
-        addEdges(source, result);
-        return result;
-    }
-
-    private void addNodes(Graph<Object, Object> source, Graph<Object, Object> result) {
-        Deque<Graph.Node<Object>> notUsed = new ArrayDeque<>(source.getNodes());
-        List<Edge<Object, Object>> notUsedEdges = new ArrayList<>(source.getEdges());
-//        System.out.println("Coarsing subgraph of size: " + source.size());
-        while (!notUsed.isEmpty()) {
-//            System.out.println("E: " + notUsedEdges.size());
-//            try {
-//                System.out.println(MAPPER.writeValueAsString(notUsed));
-//            } catch (JsonProcessingException ex) {
-//                Logger.getLogger(App.class.getName()).log(Level.SEVERE, null, ex);
-//            }
-            Graph.Node<Object> node = notUsed.peek();
-            Optional<Edge<Object, Object>> optional = findEdge(notUsedEdges, node);
-            if (optional.isPresent()) {
-                Graph.Node<Object> other = optional.get().getOther(node).get();
-                if (!notUsed.contains(other)) {
-                    continue;
-                }
-                notUsed.remove(other);
-                notUsed.remove(node);
-                notUsedEdges.removeAll(source.getNeighbourEdges(node));
-                notUsedEdges.removeAll(source.getNeighbourEdges(other));
-
-                Graph.Node<Object> newNode = new Graph.Node(new Combiner(node, other));
-                childToParentMap.put(node, newNode);
-                childToParentMap.put(other, newNode);
-                result.add(newNode);
-            } else {
-//                System.out.println("Singleton graph");
-                notUsed.remove(node);
-                Graph.Node<Object> newNode = new Graph.Node(new Wrapper(node));
-                childToParentMap.put(node, newNode);
-                result.add(newNode);
-            }
-        }
-    }
-
-    private Optional<Edge<Object, Object>> findEdge(List<Edge<Object, Object>> edges, Graph.Node<Object> node) {
-        return edges
-                .stream()
-                .filter(e -> e.contains(node))
-                .findAny();
-    }
-
-    private void addEdges(Graph<Object, Object> source, Graph<Object, Object> result) {
-        result.forEach(n -> {
-            FunctionalUtil.acceptIfCan(Combiner.class, n.getLabel(), combiner -> {
-                addEdge(source, combiner.first, result);
-                addEdge(source, combiner.second, result);
-            });
-
-            FunctionalUtil.acceptIfCan(Wrapper.class, n.getLabel(), wrapper -> {
-                addEdge(source, wrapper.node, result);
-            });
-        });
-    }
-
-    private void addEdge(Graph<Object, Object> source, Graph.Node<Object> node, Graph<Object, Object> result) {
-        source.getNeighbourEdges(node).forEach(e -> {
-            Graph.Node<Object> parent = childToParentMap.get(node);
-            Graph.Node<Object> otherParent = childToParentMap.get(e.getOther(node).get());
-            if (otherParent.equals(parent)) {
-                return;
-            }
-            result.add(new Edge(parent, otherParent, "wut", true));
-        });
-    }
-
-    private static class Combiner {
-
-        private final Graph.Node<Object> first;
-        private final Graph.Node<Object> second;
-
-        public Combiner(Graph.Node<Object> first, Graph.Node<Object> second) {
-            this.first = first;
-            this.second = second;
-        }
-
-        @JsonProperty("f")
-        public Graph.Node<Object> getFirst() {
-            return first;
-        }
-
-        @JsonProperty("s")
-        public Graph.Node<Object> getSecond() {
-            return second;
-        }
-
-        @Override
-        public int hashCode() {
-            int hash = 3;
-            hash = 89 * hash + Objects.hashCode(this.first);
-            hash = 89 * hash + Objects.hashCode(this.second);
-            return hash;
-        }
-
-        @Override
-        public boolean equals(Object obj) {
-            if (obj == null || getClass() != obj.getClass()) {
-                return false;
-            }
-            final Combiner other = (Combiner) obj;
-            if (!Objects.equals(this.first, other.first)) {
-                return false;
-            }
-            return Objects.equals(this.second, other.second);
-        }
-
-        @Override
-        public String toString() {
-            return "{" + first + "|" + second + "}";
-        }
-    }
-
-    private static class Wrapper {
-
-        private final Graph.Node<Object> node;
-
-        public Wrapper(Graph.Node<Object> node) {
-            this.node = node;
-        }
-
-        @JsonProperty("n")
-        public Graph.Node<Object> getNode() {
-            return node;
-        }
-
-        @Override
-        public int hashCode() {
-            int hash = 3;
-            hash = 59 * hash + Objects.hashCode(this.node);
-            return hash;
-        }
-
-        @Override
-        public boolean equals(Object obj) {
-            if (obj == null || getClass() != obj.getClass()) {
-                return false;
-            }
-            final Wrapper other = (Wrapper) obj;
-            return Objects.equals(this.node, other.node);
-        }
-
-        @Override
-        public String toString() {
-            return "[" + node + "]";
-        }
+    public float getDelta() {
+        return delta;
     }
 
 }

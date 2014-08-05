@@ -44,7 +44,7 @@ public class Renderer implements Startable {
     private FloatBuffer lineBuffer;
     private int lineVboID;
     private int lineVaoID;
-    private static final int MAX_LINES = 20000;
+    private static final int MAX_LINES = 200000;
 
     public Renderer(App context) {
         this.context = context;

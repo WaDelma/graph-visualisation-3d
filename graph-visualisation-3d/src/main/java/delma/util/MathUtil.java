@@ -14,10 +14,11 @@ public enum MathUtil {
     public static final double Ke = 8987551787.3681764;
 
     public static void randomUnitVector(Random rand, Vector3f vector) {
-        float angle = rand.nextFloat() * (float) TAU;
-        vector.z = rand.nextFloat() * 2 - 1;
-        float thingy = (float) Math.sqrt(1 - vector.z * vector.z);
-        vector.x = thingy * (float) Math.cos(angle);
-        vector.y = thingy * (float) Math.sin(angle);
+        double angle = rand.nextDouble() * TAU;
+        double z = rand.nextDouble() * 2 - 1;
+        vector.z = (float) z;
+        double thingy = (float) Math.sqrt(1 - (z * z));
+        vector.x = (float) (thingy * Math.cos(angle));
+        vector.y = (float) (thingy * Math.sin(angle));
     }
 }

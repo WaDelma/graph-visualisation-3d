@@ -62,9 +62,12 @@ public interface Graph<N, E> extends Iterable<Node<N>> {
     static class Node<N> {
 
         private final N label;
+        private int hash;
 
         public Node(N label) {
             this.label = label;
+            hash = 7;
+            hash = 83 * hash + Objects.hashCode(this.label);
         }
 
         @JsonProperty("l")
@@ -74,14 +77,12 @@ public interface Graph<N, E> extends Iterable<Node<N>> {
 
         @Override
         public int hashCode() {
-            int hash = 7;
-            hash = 83 * hash + Objects.hashCode(this.label);
             return hash;
         }
 
         @Override
         public boolean equals(Object obj) {
-            if (obj == null || getClass() != obj.getClass()) {
+            if (obj == null || getClass() != obj.getClass() || obj.hashCode() != hashCode()) {
                 return false;
             }
             final Node<?> other = (Node<?>) obj;
