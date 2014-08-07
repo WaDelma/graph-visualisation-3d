@@ -184,6 +184,16 @@ public class VisualisableGraph implements Graph<Object, Object> {
         return Optional.of(edges.get(rand.nextInt(edges.size())));
     }
 
+    @Override
+    public void setNodes(Collection<Node<Object>> nodes) {
+        nodes.forEach(this::add);
+    }
+
+    @Override
+    public void setEdges(Collection<Edge<Object, Object>> edges) {
+        edges.forEach(this::add);
+    }
+
     private class Transpose implements Graph<Object, Object> {
 
         @Override
@@ -277,6 +287,16 @@ public class VisualisableGraph implements Graph<Object, Object> {
         @Override
         public Collection<Graph<Object, Object>> getSubgraphs() {
             return VisualisableGraph.this.getSubgraphs();
+        }
+
+        @Override
+        public void setNodes(Collection<Node<Object>> nodes) {
+            nodes.forEach(this::add);
+        }
+
+        @Override
+        public void setEdges(Collection<Edge<Object, Object>> edges) {
+            edges.forEach(this::add);
         }
     }
 

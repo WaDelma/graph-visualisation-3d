@@ -8,9 +8,13 @@ import delma.graph.visualisation.entity.Entity;
 import delma.graph.visualisation.entity.Node;
 import delma.tree.Octree;
 import delma.util.FunctionalUtil;
+import java.io.File;
+import java.io.IOException;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 import org.lwjgl.input.Keyboard;
 import org.lwjgl.input.Mouse;
 import org.lwjgl.opengl.Display;
@@ -80,11 +84,24 @@ public class App implements Startable {
         while (Keyboard.next()) {
             boolean state = Keyboard.getEventKeyState();
             switch (Keyboard.getEventKey()) {
-                case Keyboard.KEY_0:
+                case Keyboard.KEY_1:
                     if (state) {
                         entities.clear();
                         nodemap.clear();
-                        GraphGenerator.generate(graph, true, 10000, 5000, n -> n, n -> n);
+                        GraphGenerator.generate(graph, true, 100, 50, n -> n, n -> n);
+                        coarcer.coarce(graph);
+                    }
+                    break;
+                case Keyboard.KEY_2:
+                    if (state) {
+                        saveGraph(graph, "./rsc/graphs/graph1");
+                    }
+                    break;
+                case Keyboard.KEY_3:
+                    if (state) {
+                        entities.clear();
+                        nodemap.clear();
+                        loadGraph(graph, "./rsc/graphs/graph1");
                         coarcer.coarce(graph);
                     }
                     break;
@@ -174,6 +191,35 @@ public class App implements Startable {
 
     public float getDelta() {
         return delta;
+    }
+
+    public void loadGraph(Graph<Object, Object> graph, String fileName) {
+        graph.clear();
+        File file = new File(fileName);
+        file.getParentFile().mkdirs();
+        try {
+            file.createNewFile();
+        } catch (IOException ex) {
+        }
+        try {
+            graph.add(MAPPER.readValue(file, Graph.class));
+        } catch (IOException ex) {
+            Logger.getLogger(App.class.getName()).log(Level.SEVERE, null, ex);
+        }
+    }
+
+    private void saveGraph(Graph<Object, Object> graph, String fileName) {
+        File file = new File(fileName);
+        file.getParentFile().mkdirs();
+        try {
+            file.createNewFile();
+        } catch (IOException ex) {
+        }
+        try {
+            MAPPER.writeValue(file, graph);
+        } catch (IOException ex) {
+            Logger.getLogger(App.class.getName()).log(Level.SEVERE, null, ex);
+        }
     }
 
 }

@@ -1,6 +1,12 @@
 package delma.graph;
 
+import com.fasterxml.jackson.annotation.JsonCreator;
+import com.fasterxml.jackson.annotation.JsonIdentityInfo;
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonProperty;
+import com.fasterxml.jackson.annotation.JsonTypeInfo;
+import com.fasterxml.jackson.annotation.JsonTypeInfo.Id;
+import com.fasterxml.jackson.annotation.ObjectIdGenerators;
 import delma.graph.Graph.Node;
 import java.util.Collection;
 import java.util.Iterator;
@@ -14,6 +20,7 @@ import java.util.Random;
  * @param <N> Node label
  * @param <E> Edge label
  */
+@JsonTypeInfo(use = Id.CLASS, defaultImpl = VisualisableGraph.class)
 public interface Graph<N, E> extends Iterable<Node<N>> {
 
     void add(Node<N> node);
@@ -32,6 +39,8 @@ public interface Graph<N, E> extends Iterable<Node<N>> {
 
     Collection<Node<N>> getNeighbourNodes(Node<N> node);
 
+    void setNodes(Collection<Node<N>> nodes);
+
     Collection<Node<N>> getNodes();
 
     @Override
@@ -39,14 +48,18 @@ public interface Graph<N, E> extends Iterable<Node<N>> {
         return getNodes().iterator();
     }
 
+    void setEdges(Collection<Edge<N, E>> edges);
+
     Collection<Edge<N, E>> getEdges();
 
+    @JsonIgnore
     Graph<N, E> getTranspose();
 
     boolean contains(Node<N> node);
 
     int size();
 
+    @JsonIgnore
     default boolean isEmpty() {
         return size() == 0;
     }
@@ -57,8 +70,10 @@ public interface Graph<N, E> extends Iterable<Node<N>> {
 
     Optional<Edge<N, E>> getRandomEdge(Node<N> node, Random rand);
 
+    @JsonIgnore
     Collection<Graph<N, E>> getSubgraphs();
 
+    //TODO: Fix serialization
     static class Node<N> {
 
         private final N label;
@@ -95,6 +110,7 @@ public interface Graph<N, E> extends Iterable<Node<N>> {
         }
     }
 
+    @JsonIdentityInfo(generator = ObjectIdGenerators.IntSequenceGenerator.class, property = "@id")
     static class Edge<N, E> {
 
         private final Node<N> from;
@@ -106,7 +122,11 @@ public interface Graph<N, E> extends Iterable<Node<N>> {
             this(from, to, label, true);
         }
 
-        public Edge(Node<N> from, Node<N> to, E label, boolean directionless) {
+        @JsonCreator
+        public Edge(@JsonProperty("from") Node<N> from,
+                @JsonProperty("to") Node<N> to,
+                @JsonProperty("label") E label,
+                @JsonProperty("directionless") boolean directionless) {
             this.from = from;
             this.to = to;
             this.label = label;

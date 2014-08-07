@@ -137,12 +137,7 @@ public class Renderer implements Startable {
     private void setupLineBuffer() {
         // Sending data to OpenGL requires the usage of (flipped) byte buffers
         lineBuffer = BufferUtils.createFloatBuffer(MAX_LINES * Vertex.elementCount());
-//        this.vertices = Util.createBuffer(vertices);
 
-//        indicesCount = indices.length;
-//        this.indices = BufferUtils.createByteBuffer(indicesCount);
-//        this.indices.put(indices);
-//        this.indices.flip();
         // Create a new Vertex Array Object in memory and select it (bind)
         lineVaoID = GL30.glGenVertexArrays();
         GL30.glBindVertexArray(lineVaoID);
@@ -161,12 +156,6 @@ public class Renderer implements Startable {
 
         // Deselect (bind to 0) the VAO
         GL30.glBindVertexArray(0);
-
-        // Create a new VBO for the indices and select it (bind) - INDICES
-//        int indexVboID = GL15.glGenBuffers();
-//        GL15.glBindBuffer(GL15.GL_ELEMENT_ARRAY_BUFFER, indexVboID);
-//        GL15.glBufferData(GL15.GL_ELEMENT_ARRAY_BUFFER, this.indices, GL15.GL_STATIC_DRAW);
-//        GL15.glBindBuffer(GL15.GL_ELEMENT_ARRAY_BUFFER, 0);
     }
 
     @Override
