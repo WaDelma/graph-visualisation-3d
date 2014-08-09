@@ -27,11 +27,19 @@ public class Octree<N> {
     }
     private static final Deque<Vector> unused = new ArrayDeque<>();
 
-    private static Vector getVec() {
-        if (!unused.isEmpty()) {
-            return unused.pop();
+    private static Vector getVec(Vector3f vector) {
+        return getVec(vector.x, vector.y, vector.z);
+    }
+
+    private static Vector getVec(Vector vector) {
+        return getVec(vector.x, vector.y, vector.z);
+    }
+
+    private static Vector getVec(double x, double y, double z) {
+        if (unused.isEmpty()) {
+            return new Vector(x, y, z);
         } else {
-            return new Vector();
+            return unused.pop().set(x, y, z);
         }
     }
 
@@ -50,37 +58,38 @@ public class Octree<N> {
 
     public Octree(double graduality) {
         this.graduality = graduality;
-        Vector min = getVec().set(-Float.MAX_VALUE, -Float.MAX_VALUE, -Float.MAX_VALUE);
-        Vector max = getVec().set(Float.MAX_VALUE, Float.MAX_VALUE, Float.MAX_VALUE);
+        Vector min = getVec(-Float.MAX_VALUE, -Float.MAX_VALUE, -Float.MAX_VALUE);
+        Vector max = getVec(Float.MAX_VALUE, Float.MAX_VALUE, Float.MAX_VALUE);
         root = new Octree.Node(min, max);
     }
 
     public boolean addBody(N n, Vector3f vector, float mass) {
-        return addBody(root, n, getVec().set(vector), mass);
-    }
-
-    private boolean addBody(Node<N> node, N n, Vector vector, float mass) {
-        while (true) {
-            if (node.isExternal()) {
-                if (node.data != null) {
-                    Vector massCenter = node.getMassCenterInter();
-                    if (equals(massCenter, vector, graduality)) {
-                        node.data.add(n);
-                        return true;
+        Vector vec = getVec(vector);
+        try {
+            Node<N> node = root;
+            while (true) {
+                if (node.isExternal()) {
+                    if (node.data != null) {
+                        Vector massCenter = node.getMassCenterInter();
+                        if (equals(massCenter, vec, graduality)) {
+                            node.data.add(n);
+                            return true;
+                        }
+                        node.external = false;
+                        handle(add(node, massCenter), massCenter, node.mass, node.data);
+                        releaseVec(massCenter);
+                        handle(node, vec, mass, (List) null);
+                        node = add(node, vec);
+                        continue;
                     }
-                    node.external = false;
-                    handle(add(node, massCenter), massCenter, node.mass, node.data);
-                    releaseVec(massCenter);
-                    handle(node, vector, mass, (List) null);
-                    node = add(node, vector);
-                    continue;
+                    handle(node, vec, mass, n);
+                    return true;
                 }
-                handle(node, vector, mass, n);
-                releaseVec(vector);
-                return true;
+                handle(node, vec, mass, (List) null);
+                node = add(node, vec);
             }
-            handle(node, vector, mass, (List) null);
-            node = add(node, vector);
+        } finally {
+            releaseVec(vec);
         }
     }
 
@@ -91,7 +100,7 @@ public class Octree<N> {
     }
 
     private void handle(Node<N> cur, Vector vector, float mass, List<N> data) {
-        Vector thingy = getVec().set(vector);
+        Vector thingy = getVec(vector);
         thingy.mul(mass);
         cur.center.add(thingy);
         releaseVec(thingy);
@@ -115,35 +124,38 @@ public class Octree<N> {
     }
 
     private boolean equals(Vector vec1, Vector vec2, double graduality) {
-        Vector vector = getVec().set(vec1).sub(vec2);
+        Vector vector = getVec(vec1).sub(vec2);
         double length = vector.length();
         releaseVec(vector);
         return length < graduality;
     }
 
     public void forEach(Vector3f pos, float tressHold, Consumer<Node<N>> consumer) {
-        Vector poss = getVec().set(pos);
-        Deque<Node<N>> stack = new ArrayDeque<>((int) (Math.log(size) * 8));
-        stack.push(getRoot());
-        while (!stack.isEmpty()) {
-            Node<N> node = stack.pop();
-            boolean doit = node.isExternal();
-            if (!doit) {
-                Vector mass = node.getMassCenterInter();
-                doit = node.getWidth() < tressHold * Vector.dist(mass, poss);
-                releaseVec(mass);
-            }
-            if (doit) {
-                consumer.accept(node);
-            } else {
-                for (Node<N> node2 : node.getSubNodes()) {
-                    if (node2 != null) {
-                        stack.push(node2);
+        Vector position = getVec(pos);
+        try {
+            Deque<Node<N>> stack = new ArrayDeque<>((int) (Math.log(size) * 8));
+            stack.push(getRoot());
+            while (!stack.isEmpty()) {
+                Node<N> node = stack.pop();
+                boolean doit = node.isExternal();
+                if (!doit) {
+                    Vector mass = node.getMassCenterInter();
+                    doit = node.getWidth() < tressHold * Vector.dist(mass, position);
+                    releaseVec(mass);
+                }
+                if (doit) {
+                    consumer.accept(node);
+                } else {
+                    for (Node<N> node2 : node.getSubNodes()) {
+                        if (node2 != null) {
+                            stack.push(node2);
+                        }
                     }
                 }
             }
+        } finally {
+            releaseVec(position);
         }
-        releaseVec(poss);
     }
 
     public Node<N> getRoot() {
@@ -199,14 +211,14 @@ public class Octree<N> {
             double xx = octantX == 0 ? min.getX() : getDivisionX();
             double yy = octantY == 0 ? min.getY() : getDivisionY();
             double zz = octantZ == 0 ? min.getZ() : getDivisionZ();
-            return getVec().set(xx, yy, zz);
+            return getVec(xx, yy, zz);
         }
 
         private Vector calcMax(int octantX, int octantY, int octantZ) {
             double xx = octantX == 0 ? getDivisionX() : max.getX();
             double yy = octantY == 0 ? getDivisionY() : max.getY();
             double zz = octantZ == 0 ? getDivisionZ() : max.getZ();
-            return getVec().set(xx, yy, zz);
+            return getVec(xx, yy, zz);
         }
 
         private double getDivisionX() {
@@ -235,7 +247,7 @@ public class Octree<N> {
         }
 
         private Vector getMassCenterInter() {
-            Vector result = getVec().set(center);
+            Vector result = getVec(center);
             result.div(mass, 0.001f);
             return result;
         }

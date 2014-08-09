@@ -242,7 +242,7 @@ public class Renderer implements Startable {
 
         this.exitOnGLError("Error in loopCycle");
 
-        Display.sync(60);
+//        Display.sync(60);
         Display.update();
     }
 

@@ -118,6 +118,10 @@ public interface Graph<N, E> extends Iterable<Node<N>> {
         private final E label;
         private final boolean directionless;
 
+        public Edge(Edge<N, E> edge, boolean directionless) {
+            this(edge.from, edge.to, edge.label, directionless);
+        }
+
         public Edge(Node<N> from, Node<N> to, E label) {
             this(from, to, label, true);
         }
