@@ -1,9 +1,10 @@
 package delma.graph;
 
-import delma.set.DisjointSet;
+import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.Deque;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -22,29 +23,29 @@ import java.util.stream.Collectors;
 public class VisualisableGraph implements Graph<Object, Object> {
 
     private final Map<Node<Object>, List<Edge<Object, Object>>> map;
-    private final DisjointSet<Node<Object>> subGraphs;
 
     public VisualisableGraph() {
         map = new HashMap<>();
-        subGraphs = new DisjointSet<>();
     }
 
     @Override
     public void add(Node<Object> node) {
         map.computeIfAbsent(node, n -> new ArrayList<>());
-        subGraphs.add(node);
+    }
+
+    @Override
+    public void add(Edge<Object, Object> edge, boolean directionless) {
+        add(edge);
     }
 
     @Override
     public void add(Edge<Object, Object> edge) {
-        edge = new Edge(edge, true);
         Node<Object> from = edge.getFrom();
         Node<Object> to = edge.getTo();
         add(from);
         add(to);
         map.get(from).add(edge);
         map.get(to).add(edge);
-        subGraphs.union(from, to);
     }
 
     @Override
@@ -64,7 +65,6 @@ public class VisualisableGraph implements Graph<Object, Object> {
             });
             return null;
         });
-        subGraphs.remove(node);
         return true;
     }
 
@@ -75,8 +75,6 @@ public class VisualisableGraph implements Graph<Object, Object> {
         boolean flag = map.get(from).remove(edge);
         if (flag) {
             map.get(to).remove(edge);
-            subGraphs.remove(from);
-            subGraphs.remove(to);
         }
         return flag;
     }
@@ -109,38 +107,28 @@ public class VisualisableGraph implements Graph<Object, Object> {
 
     @Override
     public Collection<Graph<Object, Object>> getSubgraphs() {
+        Set<Node<Object>> nodesRemaining = new HashSet<>(map.keySet());
+        Deque<Node<Object>> stack = new ArrayDeque();
         List<Graph<Object, Object>> result = new ArrayList<>();
-        for (Set<Node<Object>> set : subGraphs) {
-            Graph<Object, Object> graph = new VisualisableGraph();
-            result.add(graph);
-            set.forEach(node -> {
-                graph.add(node);
-                map.get(node).forEach(graph::add);
-            });
+        while (!nodesRemaining.isEmpty()) {
+            stack.push(nodesRemaining.stream().findAny().get());
+            Graph<Object, Object> curGraph = new VisualisableGraph();
+            result.add(curGraph);
+            while (!stack.isEmpty()) {
+                Node<Object> cur = stack.pop();
+                if (!nodesRemaining.contains(cur)) {
+                    continue;
+                }
+                nodesRemaining.remove(cur);
+                curGraph.add(cur);
+                getNeighbourEdges(cur).forEach(curGraph::add);
+                getNeighbourEdges(cur)
+                        .stream()
+                        .map(e -> e.getOther(cur).get())
+                        .forEach(stack::push);
+            }
         }
         return result;
-//        Set<Node<Object>> nodesRemaining = new HashSet<>(map.keySet());
-//        Deque<Node<Object>> stack = new ArrayDeque();
-//        List<Graph<Object, Object>> result = new ArrayList<>();
-//        while (!nodesRemaining.isEmpty()) {
-//            stack.push(nodesRemaining.stream().findAny().get());
-//            Graph<Object, Object> curGraph = new VisualisableGraph();
-//            result.add(curGraph);
-//            while (!stack.isEmpty()) {
-//                Node<Object> cur = stack.pop();
-//                if (!nodesRemaining.contains(cur)) {
-//                    continue;
-//                }
-//                nodesRemaining.remove(cur);
-//                curGraph.add(cur);
-//                getNeighbourEdges(cur).forEach(curGraph::add);
-//                getNeighbourEdges(cur)
-//                        .stream()
-//                        .map(e -> e.getOther(cur).get())
-//                        .forEach(stack::push);
-//            }
-//        }
-//        return result;
     }
 
     @Override

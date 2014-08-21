@@ -36,7 +36,7 @@ public enum GraphGenerator {
             graph.add(curNode);
             Node<N> node = graph.getRandomNode(rand);
             if (!node.equals(curNode)) {
-                graph.add(new Edge(curNode, node, edgeLabels.apply(e), directionless));
+                graph.add(new Edge(curNode, node, edgeLabels.apply(e)), directionless);
                 e++;
             }
         }

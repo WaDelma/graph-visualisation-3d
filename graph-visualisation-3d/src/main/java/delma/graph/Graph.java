@@ -7,12 +7,17 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.annotation.JsonTypeInfo;
 import com.fasterxml.jackson.annotation.JsonTypeInfo.Id;
 import com.fasterxml.jackson.annotation.ObjectIdGenerators;
+import com.fasterxml.jackson.core.JsonProcessingException;
 import delma.graph.Graph.Node;
+import delma.graph.visualisation.App;
+import java.io.IOException;
 import java.util.Collection;
 import java.util.Iterator;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Random;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 /**
  *
@@ -26,6 +31,8 @@ public interface Graph<N, E> extends Iterable<Node<N>> {
     void add(Node<N> node);
 
     void add(Edge<N, E> edge);
+
+    void add(Edge<N, E> edge, boolean directionless);
 
     void add(Graph<N, E> graph);
 
@@ -73,19 +80,28 @@ public interface Graph<N, E> extends Iterable<Node<N>> {
     @JsonIgnore
     Collection<Graph<N, E>> getSubgraphs();
 
-    //TODO: Fix serialization
     static class Node<N> {
 
         private final N label;
         private int hash;
 
-        public Node(N label) {
+        public Node(String string) {
+            N temp = null;
+            try {
+                temp = App.MAPPER.readValue(string, (Class<N>) Object.class);
+            } catch (IOException ex) {
+                Logger.getLogger(Graph.class.getName()).log(Level.SEVERE, null, ex);
+            }
+            label = temp;
+        }
+
+        public Node(@JsonProperty("label") N label) {
             this.label = label;
             hash = 7;
             hash = 83 * hash + Objects.hashCode(this.label);
         }
 
-        @JsonProperty("l")
+        @JsonProperty("label")
         public N getLabel() {
             return label;
         }
@@ -106,7 +122,12 @@ public interface Graph<N, E> extends Iterable<Node<N>> {
 
         @Override
         public String toString() {
-            return "(" + label + ")";
+            try {
+                return App.MAPPER.writeValueAsString(label);
+            } catch (JsonProcessingException ex) {
+                Logger.getLogger(Graph.class.getName()).log(Level.SEVERE, null, ex);
+                return null;
+            }
         }
     }
 
@@ -116,25 +137,14 @@ public interface Graph<N, E> extends Iterable<Node<N>> {
         private final Node<N> from;
         private final Node<N> to;
         private final E label;
-        private final boolean directionless;
-
-        public Edge(Edge<N, E> edge, boolean directionless) {
-            this(edge.from, edge.to, edge.label, directionless);
-        }
-
-        public Edge(Node<N> from, Node<N> to, E label) {
-            this(from, to, label, true);
-        }
 
         @JsonCreator
         public Edge(@JsonProperty("from") Node<N> from,
                 @JsonProperty("to") Node<N> to,
-                @JsonProperty("label") E label,
-                @JsonProperty("directionless") boolean directionless) {
+                @JsonProperty("label") E label) {
             this.from = from;
             this.to = to;
             this.label = label;
-            this.directionless = directionless;
         }
 
         public Node<N> getFrom() {
@@ -163,20 +173,12 @@ public interface Graph<N, E> extends Iterable<Node<N>> {
             return label;
         }
 
-        public boolean isDirectionless() {
-            return directionless;
-        }
-
         @Override
         public int hashCode() {
             int hash = 7;
             hash = 97 * hash + Objects.hashCode(this.from);
             hash = 97 * hash + Objects.hashCode(this.to);
-            if (directionless) {
-                hash += Objects.hashCode(this.label);
-            } else {
-                hash = 97 * hash + Objects.hashCode(this.label);
-            }
+            hash = 97 * hash + Objects.hashCode(this.label);
             return hash;
         }
 
@@ -187,10 +189,6 @@ public interface Graph<N, E> extends Iterable<Node<N>> {
             }
             final Edge<?, ?> other = (Edge<?, ?>) obj;
             if (!Objects.equals(this.from, other.from)) {
-                if (directionless) {
-                    return Objects.equals(this.from, other.to)
-                            && Objects.equals(this.to, other.from);
-                }
                 return false;
             }
             if (!Objects.equals(this.to, other.to)) {
@@ -200,10 +198,7 @@ public interface Graph<N, E> extends Iterable<Node<N>> {
         }
 
         public static <N, E> Edge<N, E> flip(Edge<N, E> edge) {
-            if (edge.isDirectionless()) {
-                return edge;
-            }
-            return new Edge(edge.getTo(), edge.getFrom(), edge.getLabel(), false);
+            return new Edge(edge.getTo(), edge.getFrom(), edge.getLabel());
         }
     }
 }

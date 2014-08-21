@@ -102,8 +102,8 @@ public class VisualisableGraphTest {
     public void testRemove_GraphEdge() {
         Node node1 = new Node("test1");
         Node node2 = new Node("test2");
-        Graph.Edge<Object, Object> edge = new Edge(node1, node2, "test", false);
-        Graph.Edge<Object, Object> edge2 = new Edge(node2, node1, "test", false);
+        Graph.Edge<Object, Object> edge = new Edge(node1, node2, "test");
+        Graph.Edge<Object, Object> edge2 = new Edge(node2, node1, "test");
 
         graph.add(edge);
         assertEquals(1, graph.getEdges().size());

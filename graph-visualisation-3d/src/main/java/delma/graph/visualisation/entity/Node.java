@@ -1,5 +1,6 @@
 package delma.graph.visualisation.entity;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import delma.graph.Graph;
 import delma.graph.visualisation.App;
 import delma.graph.visualisation.Model;
@@ -134,6 +135,11 @@ public class Node implements Entity {
     }
 
     @Override
+    public void setPosition(Vector3f pos) {
+        this.pos.set(pos);
+    }
+
+    @Override
     public Matrix4f getModelMatrix() {
         Matrix4f modelMatrix = new Matrix4f();
         Matrix4f.scale(scale, modelMatrix, modelMatrix);
@@ -250,10 +256,12 @@ public class Node implements Entity {
     public void run() {
     }
 
+    @JsonIgnore()
     public Vector3f getVelocity() {
         return velocity;
     }
 
+    @JsonIgnore()
     public boolean isReady() {
         return halt;
     }

@@ -126,7 +126,7 @@ public class GraphCoarcer {
             if (otherParent.equals(parent)) {
                 return;
             }
-            result.add(new Graph.Edge(parent, otherParent, "wut", true));
+            result.add(new Graph.Edge(parent, otherParent, "wut"));
         });
     }
 

@@ -1,7 +1,5 @@
 package delma.set;
 
-import java.util.ArrayDeque;
-import java.util.Deque;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
@@ -15,46 +13,72 @@ import java.util.Set;
  */
 public class DisjointSet<T> implements Iterable<Set<T>> {
 
-    private static final Deque<Set> unused = new ArrayDeque<>();
-
-    private static Set getSet() {
-        if (unused.isEmpty()) {
-            return new HashSet<>();
-        } else {
-            return unused.pop();
-        }
-    }
-
-    private static void releaseSet(Set set) {
-        set.clear();
-        unused.push(set);
-    }
-
     private final Map<T, Node<T>> nodes;
+    private final Map<T, Set<T>> sets;
 
     public DisjointSet() {
         nodes = new HashMap<>();
+        sets = new HashMap<>();
     }
 
-    public void add(T object) {
+    public boolean add(T object) {
+        if (nodes.containsKey(object)) {
+            return false;
+        }
         nodes.put(object, new Node<>(object));
+        return true;
     }
 
     public T find(T object) {
         Node<T> node = nodes.get(object);
-        if (node == null) {
+        if (node == null || node.removed) {
             return null;
         }
-        return find(node).data;
+        return findInter(node).data;
     }
 
-    private Node<T> find(Node<T> node) {
-        if (node.parent != node) {
-            node.parent.children.remove(node);
-            node.parent = find(node.parent);
-            node.parent.children.add(node);
+    private Node<T> findInter(Node<T> node) {
+        if (node.parent == node) {
+            if (node.removed) {
+                return node.next;
+            }
+            return node;
+        }
+        get(node.parent).remove(node.data);
+        node.parent = findInter(node);
+        if (!get(node).isEmpty() || !node.removed) {
+            get(node.parent).add(node.data);
         }
         return node.parent;
+    }
+
+    public void union(T first, T second) {
+        Node<T> firstNode = nodes.get(first);
+        Node<T> secondNode = nodes.get(second);
+        if (firstNode == null || secondNode == null) {
+            return;
+        }
+        Node<T> firstRoot = findInter(firstNode);
+        Node<T> secondRoot = findInter(secondNode);
+        if (firstRoot == null || secondRoot == null) {
+            return;
+        }
+        if (firstRoot.rank < secondRoot.rank) {
+            unionRoot(firstRoot, secondRoot);
+            return;
+        }
+        if (firstRoot.rank == secondRoot.rank) {
+            firstRoot.rank++;
+        }
+        unionRoot(secondRoot, firstRoot);
+    }
+
+    private void unionRoot(Node<T> first, Node<T> second) {
+        first.parent = second;
+        get(second).add(first.data);
+        first.next = second.next;
+        second.next = first;
+        first.prev = second;
     }
 
     public boolean remove(T object) {
@@ -62,70 +86,44 @@ public class DisjointSet<T> implements Iterable<Set<T>> {
         if (node == null) {
             return false;
         }
-        if (!node.children.isEmpty()) {
-            Node<T> newParent = node.children.iterator().next();
-            node.children.forEach(n -> {
-                if (n != newParent) {
-                    newParent.children.add(n);
-                }
-                n.parent = newParent;
-            });
-            if (node.parent != node) {
-                newParent.parent = node.parent;
-            }
-        } else if (node != node.parent) {
-            node.parent.children.remove(node);
+        node.prev.next = node.next;
+        node.next.prev = node.prev;
+        node.removed = true;
+        if (get(node).isEmpty()) {
+            get(node.parent).remove(node.data);
         }
-        releaseSet(node.children);
-        return nodes.remove(object) != null;
-    }
-
-    public void union(T first, T second) {
-        if (first.equals(second)) {
-            return;
-        }
-        Node<T> firstR = find(nodes.get(first));
-        Node<T> secondR = find(nodes.get(second));
-        if (firstR.rank < secondR.rank) {
-            secondR.children.add(firstR);
-            firstR.parent = secondR;
-        } else if (firstR.rank > secondR.rank) {
-            firstR.children.add(secondR);
-            secondR.parent = firstR;
-        } else {
-            firstR.children.add(secondR);
-            secondR.parent = firstR;
-            firstR.rank = firstR.rank + 1;
-        }
+        return true;
     }
 
     @Override
     public Iterator<Set<T>> iterator() {
-        Map<T, Set<T>> result = new HashMap<>();
-        nodes.forEach((k, v) -> {
-            T root = find(k);
-            result.computeIfAbsent(root, key -> new HashSet<>())
-                    .add(k);
-        });
-        return result.values().iterator();
+        return sets.values().iterator();
     }
 
-    public int size() {
+    private Set<T> get(Node<T> node) {
+        return sets.computeIfAbsent(node.data, k -> new HashSet<>());
+    }
+
+    int size() {
         return nodes.size();
     }
 
-    private class Node<T> {
+    private static class Node<T> {
 
-        private final T data;
-        private final Set<Node<T>> children;
-
-        private Node<T> parent;
+        private Node parent;
+        private Node prev;
+        private Node next;
+        private boolean removed;
         private int rank;
+        private final T data;
 
-        private Node(T data) {
-            this.data = data;
+        Node(T object) {
+            data = object;
+            next = this;
+            prev = this;
             parent = this;
-            children = getSet();
+            rank = 0;
+            removed = false;
         }
     }
 }

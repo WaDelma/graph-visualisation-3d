@@ -1,5 +1,6 @@
 package delma.graph.visualisation;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import delma.graph.Graph;
 import delma.graph.GraphGenerator;
@@ -39,7 +40,7 @@ public class App implements Startable {
     private Graph<Object, Object> graph;
     private static final float CAM_SPEED = 2f;
     private final Vector3f camMove = new Vector3f();
-    private static final ObjectMapper MAPPER = new ObjectMapper();
+    public static final ObjectMapper MAPPER = new ObjectMapper();
     private Octree<Entity> octree;
     private GraphCoarcer coarcer;
     private float delta;
@@ -94,14 +95,12 @@ public class App implements Startable {
                     break;
                 case Keyboard.KEY_2:
                     if (state) {
-                        saveGraph(graph, "./rsc/graphs/graph1");
+                        saveGraph(graph, nodemap, "./rsc/graphs/graph1");
                     }
                     break;
                 case Keyboard.KEY_3:
                     if (state) {
-                        entities.clear();
-                        nodemap.clear();
-                        loadGraph(graph, "./rsc/graphs/graph1");
+                        loadGraph(graph, nodemap, "./rsc/graphs/graph1");
                         coarcer.coarce(graph);
                     }
                     break;
@@ -193,8 +192,9 @@ public class App implements Startable {
         return delta;
     }
 
-    public void loadGraph(Graph<Object, Object> graph, String fileName) {
+    public void loadGraph(Graph<Object, Object> graph, Map<Graph.Node<Object>, Node> nodemap, String fileName) {
         graph.clear();
+        nodemap.clear();
         File file = new File(fileName);
         file.getParentFile().mkdirs();
         try {
@@ -202,13 +202,15 @@ public class App implements Startable {
         } catch (IOException ex) {
         }
         try {
-            graph.add(MAPPER.readValue(file, Graph.class));
+            Combination combination = MAPPER.readValue(file, Combination.class);
+            graph.add(combination.graph);
+            nodemap.putAll(combination.nodemap);
         } catch (IOException ex) {
             Logger.getLogger(App.class.getName()).log(Level.SEVERE, null, ex);
         }
     }
 
-    private void saveGraph(Graph<Object, Object> graph, String fileName) {
+    private void saveGraph(Graph<Object, Object> graph, Map<Graph.Node<Object>, Node> nodemap, String fileName) {
         File file = new File(fileName);
         file.getParentFile().mkdirs();
         try {
@@ -216,9 +218,20 @@ public class App implements Startable {
         } catch (IOException ex) {
         }
         try {
-            MAPPER.writeValue(file, graph);
+            MAPPER.writeValue(file, new Combination(graph, nodemap));
         } catch (IOException ex) {
             Logger.getLogger(App.class.getName()).log(Level.SEVERE, null, ex);
+        }
+    }
+
+    private static class Combination {
+
+        public Graph<Object, Object> graph;
+        public Map<Graph.Node<Object>, Node> nodemap;
+
+        public Combination(@JsonProperty("graph") Graph<Object, Object> graph, @JsonProperty("nodemap") Map<Graph.Node<Object>, Node> nodemap) {
+            this.graph = graph;
+            this.nodemap = nodemap;
         }
     }
 
